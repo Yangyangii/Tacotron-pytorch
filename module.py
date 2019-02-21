@@ -24,7 +24,7 @@ class Conv2d(nn.Conv2d):
                                      stride=stride, padding=padding, dilation=dilation,
                                      groups=groups, bias=bias)
         self.drop_out = nn.Dropout(drop_rate) if drop_rate > 0 else None
-        self.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-3, momentum=0.001) if bn else None
+        self.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-6, momentum=0.01) if bn else None
 
     def forward(self, x):
         y = super(Conv2d, self).forward(x)
@@ -54,7 +54,7 @@ class Conv1d(nn.Conv1d):
                                             stride=stride, padding=padding, dilation=dilation,
                                             groups=groups, bias=bias)
         self.drop_out = nn.Dropout(drop_rate) if drop_rate > 0 else None
-        self.batch_norm = nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.001) if bn else None
+        self.batch_norm = nn.BatchNorm1d(out_channels, eps=1e-6, momentum=0.01) if bn else None
 
     def forward(self, x):
         y = super(Conv1d, self).forward(x)
