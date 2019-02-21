@@ -32,10 +32,10 @@
 ![](assets/attention.gif)
 
 ## Notes
-- Evaluation loss converges quickly, but attention converges slow.
-- In synthesis step, the model will load the best. But the latest is better.
 - I used bilinear attention instead of MLP attention in the model.
+- I adjusted some momentums to stabilize the model. It alliviates overfitting.
 
 ![](assets/loss.JPG)
+
 ## Other Codes
 - [Kyubyong's TensorFlow implementation](https://github.com/Kyubyong/tacotron)
