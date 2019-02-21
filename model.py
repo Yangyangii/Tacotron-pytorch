@@ -8,8 +8,8 @@ class Tacotron(nn.Module):
     """
     Text2Mel
     Args:
-        L: (N, Tx) text
-        S: (N, Ty/r, n_mels*r) previous audio
+        enc_inputs: (N, Tx) text
+        dec_inputs: (N, Ty/r, n_mels*r) previous audio
     Returns:
         mels_hat: (N, Ty/r, n_mels*r)
         mags_hat: (N, Ty, n_mags)
@@ -20,7 +20,7 @@ class Tacotron(nn.Module):
         self.name = 'Tacotron'
         self.embed = nn.Embedding(len(args.vocab), args.Ce, padding_idx=0)
         self.encoder = ContextEncoder()
-        self.decoder = AudioDecoder()
+        self.decoder = AudioDecoder(enc_dim=args.Cx*2, dec_dim=args.Cx)
     
     def forward(self, enc_inputs, dec_inputs, synth=False):
         x = self.embed(enc_inputs)  # (N, Tx, Ce)

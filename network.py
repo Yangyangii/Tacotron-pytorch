@@ -35,10 +35,10 @@ class CBHG(nn.Module):
     Args:
         x: (N, Tx, input_dim) Tensor (variable length)
     Returns:
-        y_: (N, hidden_dim, Tx) 
+        y_: (N, hidden_dim*2, Tx) 
     """
 
-    def __init__(self, input_dim, hidden_dim, K=16, n_highway=4):
+    def __init__(self, input_dim, hidden_dim, K=16, n_highway=4, bidirectional=True):
         super(CBHG, self).__init__()
         self.K = K
         self.conv_bank = mm.Conv1dBank(input_dim, hidden_dim, K=self.K, activation_fn=torch.relu)
@@ -50,7 +50,7 @@ class CBHG(nn.Module):
         self.highway = nn.ModuleList(
             [mm.Highway(input_dim) for _ in range(n_highway)]
         )
-        self.gru = nn.GRU(input_dim, hidden_dim//2, num_layers=1, batch_first=True, bidirectional=True) # if batch_first is True, (Batch, Sequence, Feature)
+        self.gru = nn.GRU(input_dim, hidden_dim, num_layers=1, batch_first=True, bidirectional=bidirectional) # if batch_first is True, (Batch, Sequence, Feature)
 
     def forward(self, x, prev=None):
         y_ = x.transpose(1, 2) # (N, input_dim, Tx)
@@ -71,7 +71,7 @@ class ContextEncoder(nn.Module):
     Text Encoder
         x: (N, Tx,) Text (variable length)
     Returns:
-        y_: (N, Cx, Tx) Text Encoding for Key
+        y_: (N, Cx*2, Tx) Text Encoding for Key
     """
     def __init__(self):
         super(ContextEncoder, self).__init__()
@@ -95,26 +95,26 @@ class AudioDecoder(nn.Module):
         mag: (N, Ty, n_mags)
         A: (N, Ty/r, Tx)
     """
-    def __init__(self):
+    def __init__(self, enc_dim, dec_dim):
         super(AudioDecoder, self).__init__()
-        self.prenet = PreNet(args.n_mels*args.r, args.Cx)
-        self.cbhg = CBHG(input_dim=args.n_mels, hidden_dim=args.Cx, K=8, n_highway=4)
-        self.attention_rnn = mm.AttentionRNN()
-        self.proj_att = nn.Linear(args.Cx*2, args.Cx)
+        self.prenet = PreNet(args.n_mels*args.r, dec_dim)
+        self.attention_rnn = mm.AttentionRNN(enc_dim=enc_dim, dec_dim=dec_dim)
+        self.proj_att = nn.Linear(enc_dim+dec_dim, dec_dim)
         self.decoder_rnn = nn.ModuleList([
-            nn.GRU(args.Cx, args.Cx, num_layers=1, batch_first=True, bidirectional=False)
+            nn.GRU(dec_dim, dec_dim, num_layers=1, batch_first=True, bidirectional=False)
             for _ in range(2)
         ])
-        self.proj_mel = nn.Linear(args.Cx, args.n_mels*args.r)
-        self.proj_mag = nn.Linear(args.Cx, args.n_mags)
+        self.proj_mel = nn.Linear(dec_dim, args.n_mels*args.r)
+        self.cbhg = CBHG(input_dim=args.n_mels, hidden_dim=dec_dim, K=8, n_highway=4, bidirectional=True)
+        self.proj_mag = nn.Linear(dec_dim*2, args.n_mags)
 
     def forward(self, decoder_inputs, encoder_outputs, prev_hidden=None, synth=False):
         if not synth: # Train mode & Eval mode
             y_ = self.prenet(decoder_inputs) # (N, Ty/r, Cx)
             # Attention RNN
             y_, A, hidden = self.attention_rnn(encoder_outputs, y_) # y_: (N, Ty/r, Cx), A: (N, Ty/r, Tx)
-            # bmm (N, Ty/r, Tx) . (N, Tx, Cx)
-            c = torch.bmm(A, encoder_outputs) # (N, Ty/r, Cx)
+            # (N, Ty/r, Tx) . (N, Tx, enc_dim)
+            c = torch.matmul(A, encoder_outputs) # (N, Ty/r, enc_dim)
             y_ = self.proj_att(torch.cat([c, y_], dim=-1)) # (N, Ty/r, Cx)
 
             # Decoder RNN
@@ -127,7 +127,7 @@ class AudioDecoder(nn.Module):
 
             # Decoder CBHG
             y_ = mels_hat.view(mels_hat.size(0), -1, args.n_mels) # (N, Ty, n_mels)
-            y_, _ = self.cbhg(y_)  # (N, Ty, Cx)
+            y_, _ = self.cbhg(y_)  # (N, Ty, Cx*2)
             mags_hat = self.proj_mag(y_) # (N, Ty, n_mags)
             return mels_hat, mags_hat, A
         else:
@@ -145,7 +145,7 @@ class AudioDecoder(nn.Module):
                 attention.append(A)
                 # Encoder outputs: (N, Tx, Cx)
                 # A: (N, )
-                c = torch.bmm(A, encoder_outputs)  # (N, Ty/r, Cx)
+                c = torch.matmul(A, encoder_outputs)  # (N, Ty/r, Cx)
                 y_ = self.proj_att(torch.cat([c, y_], dim=-1))  # (N, Ty/r, Cx)
 
                 # Decoder RNN
