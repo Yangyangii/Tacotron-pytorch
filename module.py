@@ -3,9 +3,40 @@ import torch
 import torch.nn as nn
 import numpy as np
 
+
+class Conv2d(nn.Conv2d):
+    """
+    Convolution 2d
+    Args:
+        x: (N, C_in, T)
+    Returns:
+        y: (N, C_out, T)
+    """
+
+    def __init__(self, in_channels, out_channels, kernel_size, activation_fn=None, drop_rate=0.,
+                 stride=1, padding='same', dilation=1, groups=1, bias=True, bn=False):
+        self.activation_fn = activation_fn
+        self.drop_rate = drop_rate
+        if padding == 'same':
+            padding = kernel_size // 2 * dilation
+            self.even_kernel = not bool(kernel_size % 2)
+        super(Conv2d, self).__init__(in_channels, out_channels, kernel_size,
+                                     stride=stride, padding=padding, dilation=dilation,
+                                     groups=groups, bias=bias)
+        self.drop_out = nn.Dropout(drop_rate) if drop_rate > 0 else None
+        self.batch_norm = nn.BatchNorm2d(out_channels, eps=1e-3, momentum=0.001) if bn else None
+
+    def forward(self, x):
+        y = super(Conv2d, self).forward(x)
+        y = self.batch_norm(y) if self.batch_norm is not None else y
+        y = self.activation_fn(y) if self.activation_fn is not None else y
+        y = self.drop_out(y) if self.drop_out is not None else y
+        y = y[:, :, :-1] if self.even_kernel else y
+        return y
+
 class Conv1d(nn.Conv1d):
     """
-    Hightway Convolution 1d
+    Convolution 1d
     Args:
         x: (N, C_in, T)
     Returns:
@@ -23,12 +54,12 @@ class Conv1d(nn.Conv1d):
                                             stride=stride, padding=padding, dilation=dilation,
                                             groups=groups, bias=bias)
         self.drop_out = nn.Dropout(drop_rate) if drop_rate > 0 else None
-        self.batch_norm = nn.BatchNorm1d(out_channels) if bn else None
+        self.batch_norm = nn.BatchNorm1d(out_channels, eps=1e-3, momentum=0.001) if bn else None
 
     def forward(self, x):
         y = super(Conv1d, self).forward(x)
-        y = self.activation_fn(y) if self.activation_fn is not None else y
         y = self.batch_norm(y) if self.batch_norm is not None else y
+        y = self.activation_fn(y) if self.activation_fn is not None else y
         y = self.drop_out(y) if self.drop_out is not None else y
         y = y[:, :, :-1] if self.even_kernel else y
         return y
@@ -115,21 +146,57 @@ class AttentionRNN(nn.Module):
         s: (N, Ty/r, Cx) Decoder outputs
         A: (N, Ty/r, Tx) attention
     """
-
-    def __init__(self):
+    def __init__(self, enc_dim, dec_dim):
         super(AttentionRNN, self).__init__()
-        self.gru = nn.GRU(args.Cx, args.Cx, num_layers=1, batch_first=True, bidirectional=False)
-        self.U = nn.Linear(args.Cx, args.Ca, bias=False)
-        self.W = nn.Linear(args.Cx, args.Ca, bias=False)
-        self.v = nn.Linear(args.Ca, 1, bias=False)
+        self.gru = nn.GRU(dec_dim, dec_dim, num_layers=1, batch_first=True, bidirectional=False)
+        self.att = BilinearAttention(enc_dim, dec_dim)
 
     def forward(self, h, s, prev_hidden=None):
-        Tx, Ty = h.size(1), s.size(1)  # Tx, Ty
         # Attention RNN
         s, hidden = self.gru(s, prev_hidden) # (N, Ty/r, Cx)
-        Uh = self.U(h).unsqueeze(1).expand(-1, Ty, -1, -1) # Encoder features expanded decoder time
-        Ws = self.W(s).unsqueeze(2).expand(-1, -1, Tx, -1) # Decoder features expanded encoder time
-        # (N, Ty, Tx, Ca)
-        e = self.v(torch.tanh(Uh + Ws)).squeeze(-1)  # (N, Ty/r, Tx)
-        A = torch.softmax(e, dim=-1)  # (N, Ty/r, Tx)
+        A = self.att(h, s) # (N, Ty/r, Tx)
         return s, A, hidden
+
+
+class MLPAttention(nn.Module):
+    """
+    BiLinear Attention
+    h_T . W . s
+    Args:
+        h: (N, Tx, Cx) Encoder outputs
+        s: (N, Ty/r, Cx) Decoder inputs (previous decoder outputs)
+    Returns:
+        A: (N, Ty/r, Tx) attention
+    """
+    def __init__(self, enc_dim, dec_dim):
+        super(MLPAttention, self).__init__()
+        self.W = nn.Linear(enc_dim+dec_dim, args.Ca, bias=True)
+        self.v = nn.Linear(args.Ca, 1, bias=False)
+
+    def forward(self, h, s):
+        Tx, Ty = h.size(1), s.size(1)  # Tx, Ty
+        hs = torch.cat([h.unsqueeze(1).expand(-1, Ty, -1, -1), s.unsqueeze(2).expand(-1, -1, Tx, -1)], dim=-1)
+        e = self.v(torch.tanh(self.W(hs))).squeeze(-1)
+        A = torch.softmax(e, dim=-1)
+        return A
+
+
+class BilinearAttention(nn.Module):
+    """
+    BiLinear Attention
+    s_T . W . h
+    Args:
+        h: (N, Tx, Cx) Encoder outputs
+        s: (N, Ty/r, Cx) Decoder inputs (previous decoder outputs)
+    Returns:
+        A: (N, Ty/r, Tx) attention
+    """
+    def __init__(self, enc_dim, dec_dim):
+        super(BilinearAttention, self).__init__()
+        self.W = nn.Linear(enc_dim, dec_dim)
+
+    def forward(self, h, s):
+        wh = self.W(h) # (N, Tx, Es)
+        e = torch.matmul(wh, s.transpose(1, 2)) # (N, Tx, Ty)
+        A = torch.softmax(e.transpose(1, 2), dim=-1) # (N, Ty, Tx)
+        return A

@@ -53,10 +53,8 @@ def main():
 
     model = Tacotron().to(DEVICE)
     
-    ckpt = pd.read_csv(os.path.join(args.logdir, model.name, 'ckpt.csv'), sep=',', header=None)
-    ckpt.columns = ['models', 'loss']
-    ckpt = ckpt.sort_values(by='loss', ascending=True)
-    state = torch.load(os.path.join(args.logdir, model.name, ckpt.models.loc[0]))
+    model_path = sorted(glob.glob(os.path.join(args.logdir, model.name, 'model-*.tar')))[-1] # latest model
+    state = torch.load(model_path)
     model.load_state_dict(state['model'])
     args.global_step = state['global_step']
 

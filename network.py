@@ -1,7 +1,6 @@
 from config import ConfigArgs as args
 import torch
 import torch.nn as nn
-from torch.nn.utils import weight_norm as norm
 import numpy as np
 import module as mm
 

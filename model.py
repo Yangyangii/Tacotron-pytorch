@@ -2,7 +2,6 @@ from config import ConfigArgs as args
 import torch
 import torch.nn as nn
 from network import ContextEncoder, AudioDecoder
-from torch.nn.utils import weight_norm as norm
 import module as mm
 
 class Tacotron(nn.Module):

@@ -118,8 +118,8 @@ def evaluate(model, data_loader, criterion, writer, global_step, batch_size=100)
     return avg_loss_mel
 
 def save_model(model, model_infos, optimizer, scheduler, val_loss, global_step, ckpt_dir):
-    cur_ckpt = 'model-{}k.pth.tar'.format(global_step//1000)
-    prev_ckpt = 'model-{}k.pth.tar'.format(global_step//1000-(args.save_term//1000))
+    cur_ckpt = 'model-{:03d}k.pth.tar'.format(global_step//1000)
+    prev_ckpt = 'model-{:03d}k.pth.tar'.format(global_step//1000-(args.save_term//1000))
     state = {
         'global_step': global_step,
         'name': model.name,

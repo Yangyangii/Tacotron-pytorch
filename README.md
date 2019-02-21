@@ -34,9 +34,8 @@
 ## Notes
 - Evaluation loss converges quickly, but attention converges slow.
 - In synthesis step, the model will load the best. But the latest is better.
+- I used bilinear attention instead of MLP attention in the model.
 
 ![](assets/loss.JPG)
 ## Other Codes
-- [KinglittleQ's GST-Tacotron](https://github.com/KinglittleQ/GST-Tacotron)
-    - I used his attention module
 - [Kyubyong's TensorFlow implementation](https://github.com/Kyubyong/tacotron)
