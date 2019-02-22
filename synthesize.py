@@ -15,6 +15,7 @@ from model import Tacotron
 from data import TextDataset, synth_collate_fn, load_vocab
 import utils
 from scipy.io.wavfile import write
+import glob
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
