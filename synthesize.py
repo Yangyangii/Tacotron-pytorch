@@ -38,7 +38,7 @@ def synthesize(model, data_loader, batch_size=100):
             visual_texts = texts.cpu().detach().numpy()
             for idx in range(len(alignments)):
                 text = [idx2char[ch] for ch in visual_texts[idx]]
-                utils.plot_att(alignments[idx], text, args.global_step, path=os.path.join(args.sampledir, 'A'), name='{}.png'.format(idx))
+                utils.plot_att(alignments[idx], text, args.global_step, path=os.path.join(args.sampledir, 'A'), name='{}.png'.format(idx+step*batch_size))
             mags[step*batch_size:(step+1)*batch_size:, :, :] = mags_hat # mag: (N, Ty, n_mags)
         print('='*10, ' Vocoder ', '='*10)
         mags = mags.cpu().detach().numpy()

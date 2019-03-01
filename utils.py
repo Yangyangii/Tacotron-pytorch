@@ -107,13 +107,13 @@ def plot_att(A, text, global_step, path='.', name=None):
         text: (Tx,) list
         global_step: scalar
     '''
-    fig, ax = plt.subplots(figsize=(25, 25))
+    fig, ax = plt.subplots(figsize=(30, 30))
     im = ax.imshow(A)
     fig.colorbar(im, fraction=0.035, pad=0.02)
-    fig.suptitle('{} Steps'.format(global_step), fontsize=30)
-    plt.ylabel('Text', fontsize=22)
-    plt.xlabel('Time', fontsize=22)
-    plt.yticks(np.arange(len(text)), text)
+    fig.suptitle('{} Steps'.format(global_step), fontsize=32)
+    plt.xlabel('Text', fontsize=26)
+    plt.ylabel('Time', fontsize=26)
+    plt.xticks(np.arange(len(text)), text)
     if name is not None:
         plt.savefig(os.path.join(path, name), format='png')
     else:
