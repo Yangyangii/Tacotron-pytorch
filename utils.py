@@ -96,7 +96,7 @@ def att2img(A):
     for i in range(A.shape[-1]):
         att = A[0, :, i]
         local_min, local_max = att.min(), att.max()
-        A[0, :, i] = (att-local_min)/local_max
+        A[0, :, i] = (att-local_min)/(local_max-local_min)
     return A
 
 
